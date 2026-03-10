@@ -37,11 +37,27 @@ public:
 			return;
 		}
 
-		// 1点あたり 0.8 秒ホールドして 1 サンプル採取
-		if (m_hold.sF() >= 0.8) {
-			const s3d::Vec2 r01 = g.readRawGaze01(); // 生視線 0..1
+		// 1点あたり一定時間を使って複数サンプルを平均採取
+		const double holdSec = 1.0;
+		const double warmupSec = 0.25;
+		const double elapsed = m_hold.sF();
+
+		if (elapsed >= warmupSec && elapsed < holdSec) {
+			m_debugRaw = g.readRawGaze01();
+			m_accumRaw += m_debugRaw;
+			++m_accumCount;
+		}
+
+		if (elapsed >= holdSec) {
+			m_debugRaw = g.readRawGaze01();
+			s3d::Vec2 r01 = m_debugRaw;
+			if (m_accumCount > 0) {
+				r01 = (m_accumRaw / static_cast<double>(m_accumCount));
+			}
 			m_raw << r01;
 			++m_idx;
+			m_accumRaw = { 0, 0 };
+			m_accumCount = 0;
 			m_hold.restart();
 		}
 	}
@@ -62,6 +78,13 @@ public:
 		mMsg(U"Look at the highlighted dots to calibrate gaze.\n"
 			 U"(Webcam if available, otherwise mouse)")
 			.draw(20, 20, s3d::Palette::White);
+
+		// 生視線位置（デバッグ可視化）
+		const s3d::Vec2 p{
+			m_debugRaw.x * static_cast<double>(s3d::Scene::Width()),
+			m_debugRaw.y * static_cast<double>(s3d::Scene::Height())
+		};
+		s3d::Circle(p, 8).draw(s3d::ColorF(1.0, 0.9, 0.2, 0.9));
 	}
 
 private:
@@ -71,6 +94,9 @@ private:
 	int m_idx = 0;                     // いま注視して欲しい点のインデックス
 	s3d::Stopwatch m_hold{ s3d::StartImmediately::Yes };
 	s3d::Font mMsg{ 20 };              // ガイドメッセージ用フォント
+	s3d::Vec2 m_accumRaw{ 0, 0 };
+	int m_accumCount = 0;
+	s3d::Vec2 m_debugRaw{ 0.5, 0.5 };
 
 	// ====== 実装（inline） ======
 	void buildTargetsGrid() {
@@ -152,9 +178,9 @@ private:
 
 		// Mat3x2 の並び: [a b 0; d e 0; c f 1]
 		outA = s3d::Mat3x2(
-			wx[0], wy[0],
-			wx[1], wy[1],
-			wx[2], wy[2]
+			static_cast<float>(wx[0]), static_cast<float>(wy[0]),
+			static_cast<float>(wx[1]), static_cast<float>(wy[1]),
+			static_cast<float>(wx[2]), static_cast<float>(wy[2])
 		);
 		return true;
 	}

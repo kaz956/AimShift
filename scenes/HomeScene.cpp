@@ -51,10 +51,12 @@ void HomeScene::draw() const {
 
 	// 操作説明
 	mFont(U"[←][→] Change Weapon   [Enter] Start").drawAt(s3d::Scene::CenterF().movedBy(0, 40));
+	mFont(U"Gaze Input: {}"_fmt(g.usingWebcam ? U"Webcam" : U"Mouse fallback"))
+		.drawAt(s3d::Scene::CenterF().movedBy(0, 72), s3d::Palette::Orange);
 
 	// 武器リスト
 	const double x0 = s3d::Scene::CenterF().x - 240;
-	double y = s3d::Scene::CenterF().y + 90;
+	double y = s3d::Scene::CenterF().y + 120;
 	for (size_t i = 0; i < g.armory.size(); ++i) {
 		const bool sel = (static_cast<int>(i) == g.equipped);
 		const s3d::ColorF col = sel ? s3d::ColorF(0.9, 1.0, 0.95) : s3d::ColorF(0.7);

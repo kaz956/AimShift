@@ -71,6 +71,7 @@ struct GameData {
 	// 視線
 	GazeCalib gaze;
 	std::unique_ptr<GazeProvider> gazeProvider; // マウス / Webカメラ
+	bool usingWebcam = false;
 	bool useCursorAttention = true;             // カーソルでも「！」判定
 	bool useGazeAttention = true;             // 視線でも「！」判定
 
@@ -97,9 +98,14 @@ struct GameData {
 
 	// 初期化
 	void initGazeProvider() {
+		usingWebcam = false;
 #ifdef USE_OPENCV
 		auto cam = std::make_unique<WebcamGazeProvider>();
-		if (cam->available()) { gazeProvider = std::move(cam); return; }
+		if (cam->available()) {
+			gazeProvider = std::move(cam);
+			usingWebcam = true;
+			return;
+		}
 #endif
 		gazeProvider = std::make_unique<MouseGazeProvider>();
 	}

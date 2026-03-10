@@ -1,73 +1,75 @@
-#pragma once
+﻿#pragma once
 #include <Siv3D.hpp>
 
-// 生視線を 0..1（左上=0,0 右下=1,1）で返す共通インタフェース
+// Return normalized gaze position in [0, 1] x [0, 1].
 struct GazeProvider {
 	virtual ~GazeProvider() = default;
-	virtual bool available() const = 0;    // デバイスが利用可能か
-	virtual s3d::Vec2 readRaw01() = 0;     // 0..1 の生視線（未取得時は {0.5,0.5} など）
+	virtual bool available() const = 0;
+	virtual s3d::Vec2 readRaw01() = 0;
 };
 
-// ===== マウス（デバッグ用） =====
+// Mouse fallback provider
 struct MouseGazeProvider final : public GazeProvider {
 	bool available() const override { return true; }
 
 	s3d::Vec2 readRaw01() override {
 		const auto p = s3d::Cursor::PosF();
 		return {
-			s3d::Clamp(p.x / (double)s3d::Scene::Width(),  0.0, 1.0),
-			s3d::Clamp(p.y / (double)s3d::Scene::Height(), 0.0, 1.0)
+			s3d::Clamp(p.x / static_cast<double>(s3d::Scene::Width()),  0.0, 1.0),
+			s3d::Clamp(p.y / static_cast<double>(s3d::Scene::Height()), 0.0, 1.0)
 		};
 	}
 };
 
 #ifdef USE_OPENCV
-// ===== OpenCV による Web カメラ視線推定 =====
 #include <opencv2/opencv.hpp>
 
 namespace detail_gaze {
 	inline bool tryOpen(cv::VideoCapture& cap, int index, int apiPref /*-1=default*/) {
 		if (cap.isOpened()) cap.release();
-		if (apiPref >= 0)  return cap.open(index, apiPref);
+		if (apiPref >= 0) return cap.open(index, apiPref);
 		return cap.open(index);
+	}
+
+	inline bool loadCascade(cv::CascadeClassifier& c, const std::string& relPath) {
+		if (c.load(relPath)) return true;
+		if (c.load("App/" + relPath)) return true;
+		if (c.load("./" + relPath)) return true;
+		if (c.load("../" + relPath)) return true;
+		try {
+			const std::string found = cv::samples::findFile(relPath, false, false);
+			if (!found.empty() && c.load(found)) return true;
+		}
+		catch (...) {}
+		return false;
 	}
 }
 
 struct WebcamGazeProvider final : public GazeProvider {
-	cv::VideoCapture      cap;
+	cv::VideoCapture cap;
 	cv::CascadeClassifier faceC, eyeC;
 	bool hasEyeCascade = false;
+	s3d::Vec2 lastRaw{ 0.5, 0.5 };
+	bool hasLastRaw = false;
 	s3d::String logLine;
 
 	WebcamGazeProvider() {
 		using namespace detail_gaze;
 
-		// --- 1) カスケード読込 ---
-		bool faceOK = false, eyeOK = false;
-		{
-#ifdef CV_VERSION
-			try {
-				faceOK = faceC.load(cv::samples::findFile("example/objdetect/haarcascade/frontal_face_alt2.xml", false, false));
-				eyeOK = eyeC.load(cv::samples::findFile("example/objdetect/haarcascade/eye.xml", false, false));
-			}
-			catch (...) { faceOK = eyeOK = false; }
-#else
-			faceOK = faceC.load("example/objdetect/haarcascade/frontal_face_alt2.xml");
-			eyeOK = eyeC.load("example/objdetect/haarcascade/eye.xml");
-#endif
-			hasEyeCascade = (faceOK && eyeOK);
-			if (!faceOK) logLine += U"[Gaze] face cascade not found. ";
-			if (!eyeOK)  logLine += U"[Gaze] eye cascade not found (fallback to face center). ";
-		}
+		bool faceOK = loadCascade(faceC, "example/objdetect/haarcascade/frontal_face_alt2.xml");
+		bool eyeOK = loadCascade(eyeC, "example/objdetect/haarcascade/eye.xml");
+		hasEyeCascade = (faceOK && eyeOK);
+		if (!faceOK) logLine += U"[Gaze] face cascade not found. ";
+		if (!eyeOK) logLine += U"[Gaze] eye cascade not found (fallback to face center). ";
 
-		// --- 2) カメラ起動を複数パターンで試す ---
 		const int indices[] = { 0, 1, 2, 3 };
 		const int apis[] = {
-		#ifdef _WIN32
+#ifdef _WIN32
 			cv::CAP_MSMF, cv::CAP_DSHOW,
-		#endif
-			- 1  // default
+#endif
+			-1
 		};
+
 		bool opened = false;
 		for (int idx : indices) {
 			for (int api : apis) {
@@ -75,6 +77,7 @@ struct WebcamGazeProvider final : public GazeProvider {
 			}
 			if (opened) break;
 		}
+
 		if (!opened) {
 			logLine += U"[Gaze] Cannot open webcam (tried 0..3 with MSMF/DShow/Default). Using mouse fallback.\n";
 		}
@@ -96,52 +99,55 @@ struct WebcamGazeProvider final : public GazeProvider {
 	}
 
 	s3d::Vec2 readRaw01() override {
-		if (!cap.isOpened()) {
-			return { 0.5, 0.5 };
-		}
+		if (!cap.isOpened()) return { 0.5, 0.5 };
 
 		cv::Mat frame;
 		if (!cap.read(frame) || frame.empty()) {
-			return { 0.5, 0.5 };
+			return hasLastRaw ? lastRaw : s3d::Vec2{ 0.5, 0.5 };
 		}
 
-		// グレースケール化 + ヒストグラム平坦化
 		cv::Mat gray;
 		cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
 		cv::equalizeHist(gray, gray);
 
-		// 顔検出
 		std::vector<cv::Rect> faces;
 		faceC.detectMultiScale(gray, faces, 1.2, 3, 0, cv::Size(80, 80));
 		if (faces.empty()) {
-			return { 0.5, 0.5 };
+			return hasLastRaw ? lastRaw : s3d::Vec2{ 0.5, 0.5 };
 		}
 
 		const cv::Rect face = faces[0];
 		const double cxFace = (face.x + face.width * 0.5) / frame.cols;
 		const double cyFace = (face.y + face.height * 0.5) / frame.rows;
 
-		// 目カスケードがなければ顔中心
+		auto updateSmoothed = [&](const s3d::Vec2& raw, double alpha) {
+			lastRaw = hasLastRaw ? s3d::Math::Lerp(lastRaw, raw, alpha) : raw;
+			hasLastRaw = true;
+			return lastRaw;
+		};
+
 		if (!hasEyeCascade) {
-			return {
+			const s3d::Vec2 raw{
 				s3d::Clamp(cxFace, 0.0, 1.0),
 				s3d::Clamp(cyFace, 0.0, 1.0)
 			};
+			return updateSmoothed(raw, 0.25);
 		}
 
-		// 目検出
 		cv::Mat roi = gray(face);
 		std::vector<cv::Rect> eyes;
 		eyeC.detectMultiScale(roi, eyes, 1.2, 2);
 
 		if (eyes.empty()) {
-			return {
+			const s3d::Vec2 raw{
 				s3d::Clamp(cxFace, 0.0, 1.0),
 				s3d::Clamp(cyFace, 0.0, 1.0)
 			};
+			return updateSmoothed(raw, 0.25);
 		}
 
-		double sx = 0.0, sy = 0.0; int n = 0;
+		double sx = 0.0, sy = 0.0;
+		int n = 0;
 		for (const auto& e : eyes) {
 			const double ex = (face.x + e.x + e.width * 0.5) / frame.cols;
 			const double ey = (face.y + e.y + e.height * 0.5) / frame.rows;
@@ -151,20 +157,18 @@ struct WebcamGazeProvider final : public GazeProvider {
 		}
 
 		if (n == 0) {
-			return {
-				s3d::Clamp(cxFace, 0.0, 1.0),
-				s3d::Clamp(cyFace, 0.0, 1.0)
-			};
+			return hasLastRaw ? lastRaw : s3d::Vec2{ 0.5, 0.5 };
 		}
 
-		const double gx = s3d::Clamp(sx / n, 0.0, 1.0);
-		const double gy = s3d::Clamp(sy / n, 0.0, 1.0);
-		return { gx, gy };
+		const s3d::Vec2 raw{
+			s3d::Clamp(sx / n, 0.0, 1.0),
+			s3d::Clamp(sy / n, 0.0, 1.0)
+		};
+		return updateSmoothed(raw, 0.35);
 	}
 };
 
 #else
-// ===== OpenCV なしビルド時のダミー Web カメラ版 =====
 struct WebcamGazeProvider final : public GazeProvider {
 	bool available() const override { return false; }
 	s3d::Vec2 readRaw01() override { return { 0.5, 0.5 }; }
