@@ -2,9 +2,11 @@
 
 #include "GameData.hpp"
 #include "scenes/HomeScene.hpp"
+#include "scenes/TutorialScene.hpp"
 #include "scenes/CalibrationScene.hpp"
 #include "scenes/RunScene.hpp"
 #include "scenes/ResultScene.hpp"
+#include "scenes/AchievementsScene.hpp"
 
 using App = s3d::SceneManager<SceneID, GameData>;
 
@@ -14,9 +16,11 @@ void Main() {
 
 	App app;
 	app.add<HomeScene>(SceneID::Home);
+	app.add<TutorialScene>(SceneID::Tutorial);
 	app.add<CalibrationScene>(SceneID::Calibration);
 	app.add<RunScene>(SceneID::Run);
 	app.add<ResultScene>(SceneID::Result);
+	app.add<AchievementsScene>(SceneID::Achievements);
 
 	// ★ ホームから開始
 	app.init(SceneID::Home);

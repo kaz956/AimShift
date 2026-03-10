@@ -9,13 +9,42 @@ HomeScene::HomeScene(const InitData& init)
 
 void HomeScene::update() {
 	auto& g = getData();
+	auto moveEquip = [&](int delta) {
+		if (g.armory.isEmpty()) return;
+		int next = g.equipped;
+		for (int i = 0; i < static_cast<int>(g.armory.size()); ++i) {
+			next = (next + delta + static_cast<int>(g.armory.size())) % static_cast<int>(g.armory.size());
+			if (next < static_cast<int>(g.weaponUnlocked.size()) && g.weaponUnlocked[next]) {
+				g.equipped = next;
+				return;
+			}
+		}
+	};
+
+	if (!(g.equipped < static_cast<int>(g.weaponUnlocked.size()) && g.weaponUnlocked[g.equipped])) {
+		for (int i = 0; i < static_cast<int>(g.weaponUnlocked.size()); ++i) {
+			if (g.weaponUnlocked[i]) {
+				g.equipped = i;
+				break;
+			}
+		}
+	}
 
 	// 装備切り替え（← / →）
 	if (s3d::KeyLeft.down()) {
-		g.equipped = (g.equipped + (int)g.armory.size() - 1) % (int)g.armory.size();
+		moveEquip(-1);
 	}
 	if (s3d::KeyRight.down()) {
-		g.equipped = (g.equipped + 1) % (int)g.armory.size();
+		moveEquip(+1);
+	}
+
+	if (s3d::KeyA.down()) {
+		changeScene(SceneID::Achievements);
+		return;
+	}
+	if (s3d::KeyT.down()) {
+		changeScene(SceneID::Tutorial);
+		return;
 	}
 
 	// ゲーム開始（Enter）→ まずキャリブレーションへ
@@ -50,7 +79,7 @@ void HomeScene::draw() const {
 	).drawAt(s3d::Scene::CenterF().movedBy(0, -80));
 
 	// 操作説明
-	mFont(U"[←][→] Change Weapon   [Enter] Start").drawAt(s3d::Scene::CenterF().movedBy(0, 40));
+	mFont(U"[←][→] Weapon  [Enter] Start  [T] Tutorial  [A] Achievements").drawAt(s3d::Scene::CenterF().movedBy(0, 40));
 	mFont(U"Gaze Input: {}"_fmt(g.usingWebcam ? U"Webcam" : U"Mouse fallback"))
 		.drawAt(s3d::Scene::CenterF().movedBy(0, 72), s3d::Palette::Orange);
 
@@ -59,8 +88,12 @@ void HomeScene::draw() const {
 	double y = s3d::Scene::CenterF().y + 120;
 	for (size_t i = 0; i < g.armory.size(); ++i) {
 		const bool sel = (static_cast<int>(i) == g.equipped);
-		const s3d::ColorF col = sel ? s3d::ColorF(0.9, 1.0, 0.95) : s3d::ColorF(0.7);
-		mFont(U"{}: {}"_fmt(i, g.armory[i].name)).draw(x0, y, col);
+		const bool unlocked = (i < g.weaponUnlocked.size()) ? g.weaponUnlocked[i] : false;
+		const s3d::ColorF col = unlocked
+			? (sel ? s3d::ColorF(0.9, 1.0, 0.95) : s3d::ColorF(0.7))
+			: s3d::ColorF(0.45, 0.45, 0.5);
+		const s3d::String tag = unlocked ? U"" : U" [LOCKED]";
+		mFont(U"{}: {}{}"_fmt(i, g.armory[i].name, tag)).draw(x0, y, col);
 		y += 26;
 	}
 }

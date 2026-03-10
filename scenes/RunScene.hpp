@@ -13,6 +13,7 @@ public:
 
 private:
 	void spawnTargets(const Difficulty& d, double now);
+	void spawnBoss(int stage, double now);
 	void updateTargets(const Difficulty& d, double t);
 	void shootIfReady(double t);
 	void updateBullets(double t);
@@ -28,6 +29,7 @@ private:
 
 	// --- UI ---
 	void drawWormhole(const s3d::Vec2& vanish) const;
+	void drawGameFrame() const;
 	void drawLifeMeter() const;
 	void drawRoundTimerAndQuota() const;   // ★ 残り時間 & ノルマ表示
 
@@ -35,6 +37,7 @@ private:
 	void emitForbiddenBurst(const s3d::Vec2& center, int count, double speed);
 	int  forbiddenBurstCountForStage(int stage) const;
 	double forbiddenBurstIntervalForStage(int stage) const;
+	BossKind bossKindForStage(int stage) const;
 
 	// ラウンド時間（ステージごとに設定）
 	double stageTimeLimitForStage(int stage) const {
@@ -75,12 +78,16 @@ private:
 	double m_stageTimeLimit = 25.0;
 	int    m_roundQuota = 10;   // ★ ノルマ
 	int    m_roundKills = 0;    // ★ 今ラウンド撃破数
+	bool   m_bossSpawnedThisRound = false;
 
 	// 消失点（“間くらい”）
 	s3d::Vec2 vanishPoint() const {
 		const double H = static_cast<double>(s3d::Scene::Height());
 		const double yTop = 80.0, yBottom = H - 120.0, blend = 0.5;
 		return { s3d::Scene::CenterF().x, yTop + (yBottom - yTop) * blend };
+	}
+	s3d::RectF playArea() const {
+		return { 0.0, 0.0, (double)s3d::Scene::Width(), (double)s3d::Scene::Height() - 140.0 };
 	}
 
 	// エフェクト蓄積

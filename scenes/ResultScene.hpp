@@ -14,6 +14,9 @@ private:
 	// W100 対策：フォントを一度だけ生成
 	s3d::Font mTitle{ 36, Typeface::Bold };
 	s3d::Font mBody{ 22 };
+	s3d::Font mLabel{ 18 };
+	s3d::Font mSmall{ 14 };
+	bool mEvaluated = false;
 
 	// %表示の小ヘルパ
 	static s3d::String fmtPercent(double x) {

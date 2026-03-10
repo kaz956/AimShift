@@ -153,6 +153,12 @@
     <ClCompile Include="scenes\ResultScene.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="scenes\AchievementsScene.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="scenes\TutorialScene.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="input\Gaze.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -843,6 +849,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="scenes\ResultScene.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="scenes\AchievementsScene.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="scenes\TutorialScene.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="input\Gaze.hpp">
