@@ -353,7 +353,6 @@
     <ClInclude Include="Entities.hpp" />
     <ClInclude Include="GameData.hpp" />
     <ClInclude Include="input\Gaze.hpp" />
-    <ClInclude Include="scenes\CalibrationScene.hpp" />
     <ClInclude Include="scenes\HomeScene.hpp" />
     <ClInclude Include="scenes\ResultScene.hpp" />
     <ClInclude Include="scenes\RunScene.hpp" />

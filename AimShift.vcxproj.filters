@@ -842,9 +842,6 @@
     <ClInclude Include="scenes\HomeScene.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="scenes\CalibrationScene.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="scenes\RunScene.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>

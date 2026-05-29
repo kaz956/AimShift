@@ -1,6 +1,21 @@
 #include "TutorialScene.hpp"
 
 namespace {
+	inline void FillPie(const s3d::Vec2& c, double r,
+		double startAngle, double angleLength,
+		const s3d::ColorF& col) {
+		const int segments = 48;
+		for (int i = 0; i < segments; ++i) {
+			const double t0 = static_cast<double>(i) / segments;
+			const double t1 = static_cast<double>(i + 1) / segments;
+			const double a0 = startAngle + angleLength * t0;
+			const double a1 = startAngle + angleLength * t1;
+			const s3d::Vec2 p0 = c + s3d::Vec2(s3d::Cos(a0), s3d::Sin(a0)) * r;
+			const s3d::Vec2 p1 = c + s3d::Vec2(s3d::Cos(a1), s3d::Sin(a1)) * r;
+			s3d::Triangle(c, p0, p1).draw(col);
+		}
+	}
+
 	inline void DrawCuteFace(const s3d::Vec2& c, double r) {
 		const double eyeR = r * 0.12;
 		const s3d::Vec2 lEye = c + s3d::Vec2(-r * 0.28, -r * 0.12);
@@ -46,7 +61,7 @@ TutorialScene::TutorialScene(const InitData& init)
 }
 
 s3d::RectF TutorialScene::playArea() const {
-	return { 0.0, 0.0, (double)s3d::Scene::Width(), (double)s3d::Scene::Height() - 140.0 };
+	return { 0.0, 0.0, (double)s3d::Scene::Width(), (double)s3d::Scene::Height() };
 }
 
 bool TutorialScene::canAcceptConfirm(double now) const {
@@ -61,7 +76,7 @@ void TutorialScene::enterExplain(double now, const s3d::String& text) {
 	mMode = TutorialMode::Explain;
 	mStepText = text;
 	mStepStartedAt = now;
-	mInputUnlockAt = now + 3.0;
+	mInputUnlockAt = now + 2.0;
 }
 
 void TutorialScene::enterAction(double now) {
@@ -73,7 +88,7 @@ void TutorialScene::enterAwaitNext(double now, const s3d::String& text) {
 	mMode = TutorialMode::AwaitNext;
 	mStepText = text;
 	mStepStartedAt = now;
-	mInputUnlockAt = now + 3.0;
+	mInputUnlockAt = now + 2.0;
 }
 
 void TutorialScene::setupStep() {
@@ -115,7 +130,7 @@ void TutorialScene::setupStep() {
 		mTargets << t;
 		break;
 	case 6:
-		enterExplain(now, U"緑の反撃: 1発当てるとライフ半分。周期反撃も発生します。");
+		enterExplain(now, U"緑の反撃: 1発当てるとライフ半分。以後は一定周期で反撃します。");
 		t.pos = s3d::Scene::CenterF().movedBy(0, -30);
 		t.radius = 34.0;
 		t.type = TargetType::Normal;
@@ -124,7 +139,7 @@ void TutorialScene::setupStep() {
 		mTargets << t;
 		break;
 	case 7:
-		enterExplain(now, U"赤ターゲット: 当てるとHPが減ります。命中後に減少を確認。");
+		enterExplain(now, U"赤ターゲット: 当てるとHPが減ります。命中後に左上の体力を確認します。");
 		t.pos = s3d::Scene::CenterF().movedBy(0, -30);
 		t.radius = 30.0;
 		t.type = TargetType::Forbidden;
@@ -133,7 +148,7 @@ void TutorialScene::setupStep() {
 		mTargets << t;
 		break;
 	case 8:
-		enterExplain(now, U"赤(!): !表示後に撃つとより大きくHPが減ります。");
+		enterExplain(now, U"赤(!): 赤にカーソルを一度重ねると ! が出ます。! 後に撃つとより大きくHPが減ります。");
 		t.pos = s3d::Scene::CenterF().movedBy(0, -30);
 		t.radius = 30.0;
 		t.type = TargetType::Forbidden;
@@ -153,7 +168,7 @@ void TutorialScene::setupStep() {
 		mTargets << t;
 		break;
 	default:
-		enterAwaitNext(now, U"チュートリアル完了。Enterでホームへ戻ります。");
+		enterAwaitNext(now, U"チュートリアル完了。クリックでホームへ戻ります。");
 		break;
 	}
 }
@@ -216,7 +231,7 @@ void TutorialScene::updateTargets(double now) {
 			const bool hover = s3d::Circle(t.pos, t.radius).intersects(s3d::Cursor::PosF());
 			if (hover) t.hoverMs += s3d::Scene::DeltaTime() * 1000.0;
 			else t.hoverMs = s3d::Max(0.0, t.hoverMs - 2.0);
-			if (!t.warnShownAt && t.hoverMs >= 120.0) t.warnShownAt = now;
+			if (!t.warnShownAt && hover) t.warnShownAt = now;
 		}
 
 		if (mStep == 6 && mMode == TutorialMode::Action && t.type == TargetType::Normal && !t.isGolden
@@ -261,6 +276,7 @@ void TutorialScene::processShoot(double now) {
 
 void TutorialScene::updateBullets() {
 	const double now = s3d::Scene::Time();
+	bool beginGreenCounterExplain = false;
 	for (auto& b : mBullets) if (b.live) {
 		const double dt = s3d::Scene::DeltaTime();
 		b.pos += b.dir2D * b.speed2D * dt;
@@ -283,7 +299,6 @@ void TutorialScene::updateBullets() {
 				mLife -= (mLastForbiddenWarned ? 2.0 : 1.0);
 				mLife = s3d::Max(0.0, mLife);
 				t.alive = false;
-				mStatus = mLastForbiddenWarned ? U"HP -2.0 (warned red hit)" : U"HP -1.0 (red hit)";
 				break;
 			}
 
@@ -294,8 +309,7 @@ void TutorialScene::updateBullets() {
 				mCounterHalfTriggered = true;
 				mLife = 4.0;
 				t.nextActionAt = now + 0.6;
-				enterExplain(now, U"ライフを半分に設定。ここから緑は一定周期で反撃します。");
-				mStatus = U"Counter phase started. HP set to half.";
+				beginGreenCounterExplain = true;
 			}
 
 			if (t.hp <= 0.0) {
@@ -306,6 +320,9 @@ void TutorialScene::updateBullets() {
 		}
 	}
 	mBullets.remove_if([](const Bullet& b) { return !b.live; });
+	if (beginGreenCounterExplain) {
+		enterExplain(now, U"ライフを半分に設定。ここから緑は一定周期で反撃します。");
+	}
 }
 
 s3d::Vec2 TutorialScene::vanishPoint() const {
@@ -332,15 +349,16 @@ void TutorialScene::drawBullets() const {
 
 void TutorialScene::update() {
 	const double now = s3d::Scene::Time();
+	const bool confirmPressed = (s3d::KeyEnter.down() || s3d::MouseL.down());
 
 	if (mMode == TutorialMode::Explain) {
-		if (canAcceptConfirm(now) && s3d::KeyEnter.down()) {
+		if (canAcceptConfirm(now) && confirmPressed) {
 			if (requiresAction(mStep)) enterAction(now);
 			else advanceStep(now);
 		}
 	}
 	else if (mMode == TutorialMode::AwaitNext) {
-		if (canAcceptConfirm(now) && s3d::KeyEnter.down()) {
+		if (canAcceptConfirm(now) && confirmPressed) {
 			if (mStep >= 10) changeScene(SceneID::Home);
 			else advanceStep(now);
 		}
@@ -356,26 +374,26 @@ void TutorialScene::update() {
 
 		switch (mStep) {
 		case 1:
-			if (mStepShots >= 10) enterAwaitNext(now, U"10発完了。弾は中央方向へ進むことを確認しました。Enterで次へ。");
+			if (mStepShots >= 10) enterAwaitNext(now, U"10発完了。弾が中央方向へ進むことを確認しました。クリックで次へ。");
 			break;
 		case 5:
 			if (!hasAliveGreen() && !hasAliveTarget(TargetType::Forbidden) && mBullets.isEmpty()) {
-				enterAwaitNext(now, U"緑ターゲットの撃破を確認。Enterで次へ。");
+				enterAwaitNext(now, U"緑ターゲットの撃破を確認。クリックで次へ。");
 			}
 			break;
 		case 6:
 			if (mCounterHalfTriggered && !hasAliveGreen() && !hasAliveTarget(TargetType::Forbidden) && mBullets.isEmpty()) {
-				enterAwaitNext(now, U"緑の反撃フェーズ完了。Enterで次へ。");
+				enterAwaitNext(now, U"緑の反撃フェーズ完了。クリックで次へ。");
 			}
 			break;
 		case 7:
 			if (mLife < mLifeBeforeStep && !hasAliveTarget(TargetType::Forbidden) && mBullets.isEmpty()) {
-				enterAwaitNext(now, U"赤ターゲット命中でHPが減少したことを確認。Enterで次へ。");
+				enterAwaitNext(now, U"赤ターゲット命中でHPが減少したことを確認。クリックで次へ。");
 			}
 			break;
 		case 8:
 			if (mLife < mLifeBeforeStep && mLastForbiddenWarned && !hasAliveTarget(TargetType::Forbidden) && mBullets.isEmpty()) {
-				enterAwaitNext(now, U"赤(!)命中で大きくHP減少したことを確認。Enterで次へ。");
+				enterAwaitNext(now, U"赤(!)命中で大きくHP減少したことを確認。クリックで次へ。");
 			}
 			else if (!hasAliveTarget(TargetType::Forbidden) && !mLastForbiddenWarned && mBullets.isEmpty()) {
 				DemoTarget t;
@@ -384,13 +402,13 @@ void TutorialScene::update() {
 				t.type = TargetType::Forbidden;
 				t.hp = t.maxHP = 1.0;
 				t.vel = { 85, 66 };
-				mTargets << t;
-				enterExplain(now, U"! が出る前に撃ちました。再度、! 表示後に撃ってください。");
+				mPendingTargets << t;
+				enterExplain(now, U"! は赤にカーソルを一度重ねると表示されます。! 表示後に撃ってください。");
 			}
 			break;
 		case 9:
 			if (!hasAliveYellow() && mBullets.isEmpty()) {
-				enterAwaitNext(now, U"黄色ターゲットフェーズ完了。Enterで次へ。");
+				enterAwaitNext(now, U"黄色ターゲットフェーズ完了。クリックで次へ。");
 			}
 			break;
 		default:
@@ -409,7 +427,7 @@ void TutorialScene::drawTarget(const DemoTarget& t) const {
 		s3d::Circle(t.pos, t.radius).draw(s3d::ColorF(0.20, 0.05, 0.05));
 		s3d::Circle(t.pos, t.radius).drawFrame(3, s3d::Palette::Crimson);
 		DrawEvilFace(t.pos, t.radius);
-		if (t.warnShownAt) mBody(U"!").drawAt(t.pos + s3d::Vec2(0, -t.radius - 28), s3d::Palette::Crimson);
+		if (t.warnShownAt) mBody(U"!").drawAt(t.pos, s3d::Palette::Crimson);
 		return;
 	}
 	if (t.isGolden) {
@@ -418,15 +436,22 @@ void TutorialScene::drawTarget(const DemoTarget& t) const {
 		s3d::Circle(t.pos + s3d::Vec2(0, -t.radius * 0.14), t.radius * 0.10).draw(s3d::ColorF(1.0, 0.95, 0.6));
 		s3d::Line(t.pos + s3d::Vec2(-t.radius * 0.24, t.radius * 0.20), t.pos + s3d::Vec2(t.radius * 0.24, t.radius * 0.20))
 			.draw(2.6, s3d::ColorF(1.0, 0.95, 0.7));
+		const double rate = s3d::Clamp(t.hp / s3d::Max(1.0, t.maxHP), 0.0, 1.0);
+		FillPie(t.pos, t.radius - 3.0, -s3d::Math::HalfPi, s3d::Math::TwoPi * rate, s3d::ColorF(1.0, 0.90, 0.35, 0.55));
 		return;
 	}
 	s3d::Circle(t.pos, t.radius).draw(s3d::ColorF(0.06, 0.22, 0.13));
 	s3d::Circle(t.pos, t.radius).drawFrame(2, s3d::Palette::Limegreen);
 	DrawCuteFace(t.pos, t.radius);
+	const double rate = s3d::Clamp(t.hp / s3d::Max(1.0, t.maxHP), 0.0, 1.0);
+	FillPie(t.pos, t.radius - 3.0, -s3d::Math::HalfPi, s3d::Math::TwoPi * rate, s3d::ColorF(0.25, 0.95, 0.6, 0.55));
 }
 
 s3d::RectF TutorialScene::currentHighlightRect() const {
 	const s3d::RectF area = playArea();
+	if ((mStep == 7 || mStep == 8) && (mMode != TutorialMode::Action)) {
+		return s3d::RectF(20, 24, 120, 120);
+	}
 	switch (mStep) {
 	case 1: return s3d::RectF(area.center().x - 180, area.center().y - 60, 360, 160);
 	case 2: return s3d::RectF(20, 24, 120, 120);
@@ -451,18 +476,19 @@ void TutorialScene::drawGuideOverlay() const {
 	hi.drawFrame(4, s3d::ColorF(1.0, 0.95, 0.55, 0.95));
 
 	const s3d::String text = currentOverlayText();
-	const double tx = hi.center().x;
-	const double ty = s3d::Min(hi.y + hi.h + 24.0, (double)s3d::Scene::Height() - 70.0);
-	const s3d::RectF box{ tx - 280, ty - 10, 560, 48 };
+	const double boxW = 560.0;
+	const double boxH = 48.0;
+	const double margin = 20.0;
+	double boxX = hi.center().x - (boxW * 0.5);
+	boxX = s3d::Clamp(boxX, margin, (double)s3d::Scene::Width() - boxW - margin);
+	double boxY = hi.y + hi.h + 14.0;
+	if ((boxY + boxH) > ((double)s3d::Scene::Height() - margin)) {
+		boxY = hi.y - boxH - 14.0;
+	}
+	boxY = s3d::Clamp(boxY, margin, (double)s3d::Scene::Height() - boxH - margin);
+	const s3d::RectF box{ boxX, boxY, boxW, boxH };
 	box.rounded(8).draw(s3d::ColorF(0, 0, 0, 0.78)).drawFrame(1, s3d::ColorF(1, 1, 1, 0.35));
-	mSmall(text).drawAt(tx, ty + 10, s3d::Palette::White);
-
-	if (s3d::Scene::Time() < mInputUnlockAt) {
-		mSmall(U"(3秒後に Enter で続行)").drawAt(tx, ty + 34, s3d::ColorF(1.0, 0.9, 0.7));
-	}
-	else {
-		mSmall(U"(Enter で続行)").drawAt(tx, ty + 34, s3d::ColorF(0.8, 1.0, 0.8));
-	}
+	mSmall(text).drawAt(box.center(), s3d::Palette::White);
 }
 
 void TutorialScene::draw() const {
@@ -477,27 +503,27 @@ void TutorialScene::draw() const {
 
 	area.draw(s3d::ColorF(0.04, 0.06, 0.10, 0.14))
 		.drawFrame(2, s3d::ColorF(0.55, 0.62, 0.75, 0.35));
-	s3d::RectF(0.0, area.h, (double)s3d::Scene::Width(), 140.0)
-		.draw(s3d::ColorF(0.08, 0.10, 0.14, 0.96))
-		.drawFrame(1, 0, s3d::ColorF(0.35, 0.43, 0.56, 0.55));
 
 	for (const auto& t : mTargets) {
 		drawTarget(t);
 	}
 	drawBullets();
 
-	// Left-top life
 	const double lifeRate = s3d::Clamp(mLife / 8.0, 0.0, 1.0);
 	const s3d::Vec2 lifeC{ 76, 80 };
 	s3d::Circle(lifeC, 44).draw(s3d::ColorF(0, 0, 0, 0.35));
 	s3d::Circle(lifeC, 44).drawFrame(3, s3d::ColorF(0.2, 0.9, 0.6, 0.9));
-	s3d::RectF(lifeC.x - 28, lifeC.y + 34, 56 * lifeRate, 6).draw(s3d::ColorF(0.2, 0.9, 0.6, 0.9));
+	s3d::LineString ring;
+	for (int i = 0; i <= 48; ++i) {
+		const double t = i / 48.0;
+		const double ang = -s3d::Math::HalfPi + (s3d::Math::TwoPi * lifeRate * t);
+		ring << (lifeC + s3d::Vec2(s3d::Cos(ang), s3d::Sin(ang)) * 34.0);
+	}
+	ring.draw(10.0, s3d::ColorF(0.2, 0.9, 0.6, 0.35));
 	mBody(U"{:.1f}"_fmt(mLife)).drawAt(lifeC, s3d::Palette::White);
 
-	// Center-top quota
 	mBody(U"Quota: {}/{}"_fmt(mKills, mQuota)).drawAt({ s3d::Scene::CenterF().x, 26.0 }, s3d::Palette::White);
 
-	// Right-top timer
 	const double remain = s3d::Max(0.0, mTimeLimit - now);
 	const double rate = s3d::Clamp(remain / mTimeLimit, 0.0, 1.0);
 	const double w = 260.0, h = 16.0;
@@ -506,14 +532,6 @@ void TutorialScene::draw() const {
 	s3d::RectF(x, y, w, h).draw(s3d::ColorF(0, 0, 0, 0.30)).drawFrame(2, s3d::ColorF(0.9, 0.9, 1.0, 0.7));
 	s3d::RectF(x, y, w * rate, h).draw(s3d::ColorF(0.25, 0.6, 1.0, 0.55));
 	mBody(U"TIME {:02d}s"_fmt((int)s3d::Floor(remain + 0.5))).drawAt({ x + w * 0.5, y + h + 14.0 }, s3d::Palette::White);
-
-	mTitle(U"Tutorial").draw(24, area.h + 10, s3d::Palette::White);
-	mSmall(U"Step {}/10"_fmt(s3d::Min(mStep + 1, 10))).draw(24, area.h + 58, s3d::ColorF(0.82, 0.90, 1.0));
-	mSmall(U"Mouse aim + left click. No ammo limit, HP management.").draw(24, area.h + 86, s3d::ColorF(0.92, 0.95, 1.0));
-
-	if (!mStatus.isEmpty()) {
-		mSmall(mStatus).draw(24, area.h + 112, s3d::ColorF(1.0, 0.86, 0.84));
-	}
 
 	drawGuideOverlay();
 }

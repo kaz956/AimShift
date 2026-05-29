@@ -244,18 +244,6 @@ void RunScene::drawGameFrame() const {
 
 	const s3d::RectF header{ area.x, area.y, area.w, 34.0 };
 	header.draw(s3d::ColorF(0.0, 0.0, 0.0, 0.20));
-
-	const s3d::RectF hudBase{ 0.0, area.h, (double)s3d::Scene::Width(), 140.0 };
-	hudBase.draw(s3d::ColorF(0.08, 0.10, 0.14, 0.96))
-		.drawFrame(1, 0, s3d::ColorF(0.35, 0.43, 0.56, 0.55));
-
-	mHUD(U"HP System (No ammo limit)").draw(24, area.h + 12, s3d::ColorF(0.86, 0.92, 1.0));
-	mHUD(U"HP down: hit red target  (! shown: -2.0 / before !: -1.0)")
-		.draw(24, area.h + 40, s3d::ColorF(1.0, 0.86, 0.84));
-	mHUD(U"Next round: Quota reached.  Game over: HP 0 or TIME 0 before quota.")
-		.draw(24, area.h + 68, s3d::ColorF(0.82, 0.90, 1.0));
-	mHUD(U"Green counter: on hit -> red burst / damaged -> periodic burst / red bullets bounce once")
-		.draw(24, area.h + 96, s3d::ColorF(1.0, 0.86, 0.84));
 }
 
 // ===== 背景（ワームホール） =====
@@ -479,8 +467,7 @@ void RunScene::updateTargets(const Difficulty& /*d*/, double t) {
 		else          tg.hoverMs = s3d::Max(0.0, tg.hoverMs - 2.0);
 
 		if (tg.type == TargetType::Forbidden
-			&& hovered && !tg.warnShownAt.has_value()
-			&& tg.hoverMs >= kWarnHoverThresholdMs) {
+			&& hovered && !tg.warnShownAt.has_value()) {
 			tg.warnShownAt = t; // 「！」表示
 		}
 

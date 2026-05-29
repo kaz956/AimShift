@@ -83,11 +83,11 @@ private:
 	// 消失点（“間くらい”）
 	s3d::Vec2 vanishPoint() const {
 		const double H = static_cast<double>(s3d::Scene::Height());
-		const double yTop = 80.0, yBottom = H - 120.0, blend = 0.5;
+		const double yTop = 80.0, yBottom = H, blend = 0.5;
 		return { s3d::Scene::CenterF().x, yTop + (yBottom - yTop) * blend };
 	}
 	s3d::RectF playArea() const {
-		return { 0.0, 0.0, (double)s3d::Scene::Width(), (double)s3d::Scene::Height() - 140.0 };
+		return { 0.0, 0.0, (double)s3d::Scene::Width(), (double)s3d::Scene::Height() };
 	}
 
 	// エフェクト蓄積

@@ -5,7 +5,7 @@
 #include "Entities.hpp"   // ★ 追加：唯一のDifficulty定義
 
 // ===== シーン / エンティティ種別 =====
-enum class SceneID { Home, Tutorial, Calibration, Run, Result, Achievements };
+enum class SceneID { Home, Tutorial, Run, Result, Achievements };
 enum class TargetType { Normal, Forbidden };
 enum class BossKind { None, Speed, Arsenal, Warp };
 
